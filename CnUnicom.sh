@@ -224,7 +224,9 @@ function membercenter() {
 }
 
 function liulactive() {
-    # 流量激活功能,可多次传入用于不同号码激活不同流量包: liulactive@d@ff80808166c5ee6701676ce21fd14716@13012341234 liulactive@w@20080615550312483@13800008888-13012341234@mygiftbag
+    # 流量激活功能,可多次传入用于不同号码激活不同流量包: liulactive@d@ff80808166c5ee6701676ce21fd14716@13012341234 liulactive@w@20080615550312483@13800008888-13012341234@mygiftbag liulactive@d@null@13800008888@mygiftbagall
+    #  mygiftbag     表示 我的礼包 - 流量包, 根据流量包的过期时间跟当前时间做对比，如果少于1天 (86400秒) 则激活
+    #  mygiftbagall  表示 我的礼包 - 流量包 里面所有包都激活
     liulactivelist=($(echo ${all_parameter[*]} | grep -oE "liulactive@[mwd]@[0-9a-z@-]+" | tr "\n" " ")) && [[ ${#liulactivelist[*]} == 0 ]] && return 0
     echo && echo starting liulactive... && echo >$workdir/liulactive.info
     for ((i = 0; i < ${#liulactivelist[*]}; i++)); do  
@@ -260,6 +262,13 @@ function liulactive() {
             for ((j = 0; j < ${#mygiftbaglist[*]}; j++)); do
                 curl -m 10 -X POST -sA "$UA"  -b $workdir/cookie --data "activeCode=${mygiftbaglist[j]%@*}&prizeRecordID=${mygiftbaglist[j]#*@}&userNumber=${username}" http://m.client.10010.com/myPrizeForActivity/queryPrizeDetails.htm >$workdir/libaollactive.log2
                 cat $workdir/libaollactive.log2 | grep -A 15 "奖品状态" | grep -qE "(未激活|激活失败)" || continue
+		edate=$(grep -A2 '激活截止时间' $workdir/libaollactive.log2  | grep 'class="fy"' | grep -oE "[0-9]{4}-[0-9]{2}-[0-9]{2} ([0-9]{2}:){2}[0-9]{2}")
+		etime=$(date -d "$edate" +"%s")
+		ntime=$(date +"%s")
+		((delta=etime-ntime))
+		[[ "$mygiftbag" != "mygiftbagall" ]] && [[ $delta -gt 86400 ]] && continue
+
+
                 libaollName=$(urlencode $(cat $workdir/libaollactive.log2 | grep "id=\"activeName" | cut -f4 -d\") | tr "a-z" "A-Z")
                 curl -m 10 -X POST -sA "$UA"  -b $workdir/cookie --data "activeCode=${mygiftbaglist[j]%@*}&prizeRecordID=${mygiftbaglist[j]#*@}&activeName=$libaollName" http://m.client.10010.com/myPrizeForActivity/myPrize/activationFlowPackages.htm | grep -oE "activationlimit"  && echo 我的礼包-流量包-1G日包-激活失败 >>$workdir/liulactive.info && break
                 sleep 10
